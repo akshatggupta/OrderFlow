@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+    nats:
+        image: nats:2.12-alpine
+        container_name: nats-server
+        command: ["nats-server", "-js", "-m", "8222"]
+        ports:
+            - "4222:4222"
+            - "8222:8222"
+            - "6222:6222"
+        networks:
+            - orderflow-network
+        volumes:
+            - nats-data:/data
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 10s 
+
+
+networks:
+    orderflow-network:
+        driver: bridge
+
+volumes:
+    nats-data:
+        driver: local
+

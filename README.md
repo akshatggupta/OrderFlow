@@ -1,3 +1,5 @@
+# OrderFlow
+
 This is the Inital workflow, this will change as the projects grow.
 
 Below contain the workflow and actual approach to solve this Problem.
@@ -31,3 +33,18 @@ Below contain the workflow and actual approach to solve this Problem.
 <img width="970" height="406" alt="image" src="https://github.com/user-attachments/assets/9f9f4074-db38-49ee-bf94-27416b585a8e" />
 
 
+## Docker Stack
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Stop and remove volume (ideal for removing cache)
+docker-compose down -v
+```
