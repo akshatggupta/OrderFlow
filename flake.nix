@@ -27,6 +27,11 @@
 
           buildInputs = [
             pkgs.python3
+            pkgs.uv
+            pkgs.black
+            pkgs.python313Packages.jedi-language-server
+            pkgs.python313Packages.debugpy
+            pkgs.ruff
           ];
 
           shellHook = ''
