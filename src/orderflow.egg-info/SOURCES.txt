@@ -1,9 +1,0 @@
-README.md
-pyproject.toml
-src/orderflow.egg-info/PKG-INFO
-src/orderflow.egg-info/SOURCES.txt
-src/orderflow.egg-info/dependency_links.txt
-src/orderflow.egg-info/requires.txt
-src/orderflow.egg-info/top_level.txt
-src/orderflow/cli/main.py
-src/orderflow/cli/service.py
