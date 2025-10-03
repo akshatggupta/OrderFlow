@@ -1,0 +1,21 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  click:
+    desc: "Run OrderFlow CLI"
+    silent: true
+    cmds:
+      - python3 src/orderflow/cli/main.py {{.ARGS}}
+
+  
+  service:
+    desc: Runs the default script
+    silent: true
+    cmds:
+      - python3 src/orderflow/cli/main.py service
+

@@ -33,6 +33,31 @@ Below contain the workflow and actual approach to solve this Problem.
 <img width="970" height="406" alt="image" src="https://github.com/user-attachments/assets/9f9f4074-db38-49ee-bf94-27416b585a8e" />
 
 
+# Installation
+
+This project is managed by uv. Hence these are some steps to follow for setup.
+
+```bash
+# Create a virtual env
+python3 -m venv .venv
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# UV install
+uv sync
+
+# CLI Working
+task click
+```
+
+```bash
+# To run service cli
+task click service
+  
+```
+
+
 ## Docker Stack
 
 ```bash
