@@ -1,5 +1,7 @@
 version: '3'
 
+dotenv: ['.env']
+
 tasks:
   default:
     desc: Show available tasks
@@ -12,10 +14,18 @@ tasks:
     cmds:
       - python3 src/orderflow/cli/main.py {{.ARGS}}
 
-  
   service:
-    desc: Runs the default script
+    desc: "Run Deribit FIX service"
     silent: true
     cmds:
-      - python3 src/orderflow/cli/main.py service
+      - python3 src/orderflow/cli/main.py service --config src/orderflow/cli/initiator.cfg
 
+  clean:
+    desc: "Clean logs and store files"
+    cmds:
+      - rm -rf log/ store/
+
+  install:
+    desc: "Install dependencies"
+    cmds:
+      - pip install quickfix click

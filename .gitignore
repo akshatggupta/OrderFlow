@@ -12,3 +12,5 @@ result
 
 # OS junk
 .DS_Store
+.env 
+env 
