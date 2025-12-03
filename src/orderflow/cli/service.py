@@ -48,45 +48,70 @@ class DeribitFIXApplication(fix.Application):
         msg_type = fix.MsgType()
         message.getHeader().getField(msg_type)
 
-        nonce = os.urandom(32)
-
-        timestamp_ms = str(int(time.time() * 1000))  #
-
-        nonce_b64 = base64.b64encode(nonce).decode('utf-8')
-        raw_data = f"{timestamp_ms}.{nonce_b64}"
-
-        # Calculate signature = base64(SHA256(raw_data + client_secret))
-        signature_input = raw_data + self.client_secret
-        signature_hash = hashlib.sha256(signature_input.encode('utf-8')).digest()
-        signature_b64 = base64.b64encode(signature_hash).decode('utf-8')
+        if msg_type.getValue() == fix.MsgType_Logon:
             
-        message.setField(fix.Username(self.client_id))              # tag 553
-        message.setField(fix.Password(signature_b64))               # tag 554
-        message.setField(fix.RawData(raw_data))                     # tag 96
-        message.setField(fix.RawDataLength(len(raw_data)))          # tag 95
-
-        logger.info("Sending Logon with Deribit authentication")
-        logger.debug(f"  Timestamp: {timestamp_ms}")
-        logger.debug(f"  RawData: {raw_data}")
+            nonce = os.urandom(32)
+            
+            
+            timestamp_ms = str(int(time.time() * 1000))
+            
+            
+            nonce_b64 = base64.b64encode(nonce).decode('utf-8')
+            
+            
+            raw_data = f"{timestamp_ms}.{nonce_b64}"
+            
+           
+            signature_input = raw_data + self.client_secret
+            signature_hash = hashlib.sha256(signature_input.encode('utf-8')).digest()
+            signature_b64 = base64.b64encode(signature_hash).decode('utf-8')
+            
+           
+            message.setField(fix.Username(self.client_id))              # tag 553
+            message.setField(fix.Password(signature_b64))               # tag 554
+            message.setField(fix.RawDataLength(len(raw_data)))          # tag 95
+            message.setField(fix.RawData(raw_data))                     # tag 96
+            
+            logger.info(" Sending Logon with Deribit authentication")
+            logger.info(f"  Client ID: {self.client_id}")
+            logger.info(f"  Client Secret (first 10): {self.client_secret[:10]}...")
+            logger.info(f"  Timestamp: {timestamp_ms}")
+            logger.info(f"  RawData length: {len(raw_data)}")
+            logger.info(f"  RawData: {raw_data}")
+            logger.info(f"  Signature (first 20): {signature_b64[:20]}...")
+            logger.info(f" Full Logon Message:\n{message.toString()}")
 
     def fromAdmin(self, message, sessionID):
-        """ call when incoming message deribit-->quickfix usually tells the deribit that i recieved the message """
+        """ call when incoming message deribit-->quickfix """
         msg_type = fix.MsgType()
         message.getHeader().getField(msg_type)
+        
+        logger.info(f" Received admin message type: {msg_type.getValue()}")
+        logger.info(f" Full message:\n{message.toString()}")
 
         if msg_type.getValue() == fix.MsgType_Logon:
-            logger.info(f"recieved logon")
-
+            logger.info(" Logon acknowledgment received from Deribit!")
+            
         elif msg_type.getValue() == fix.MsgType_Logout:
             text = fix.Text()
             if message.isSetField(text):
                 message.getField(text)
-                logger.warning(f"logout for the reason {text.getValue()}")
+                logger.error(f" LOGOUT RECEIVED - Reason: {text.getValue()}")
+            else:
+                logger.error(f" LOGOUT RECEIVED - No reason provided")
+            logger.error(f" Full logout message:\n{message.toString()}")
+            
         elif msg_type.getValue() == fix.MsgType_Reject:
-            logger.error(f"Received Reject: {message}")
+            logger.error(f" REJECT RECEIVED:\n{message.toString()}")
+            
+            if message.isSetField(fix.Text()):
+                text = fix.Text()
+                message.getField(text)
+                logger.error(f" Reject reason: {text.getValue()}")
         else:
-            logger.debug(f"Admin message: {msg_type.getValue()}")
-
+            logger.debug(f"Admin message type: {msg_type.getValue()}")
+   
+   
     def toApp(self, message, sessionID):
         """ call for the outgoing msg """
         logger.debug(f"sending message to app {message}")
