@@ -3,7 +3,7 @@ import time
 import base64
 import hashlib
 import socket
-from config import *
+from orderflow.cli.config.config import *
 
 
 def send_fix(sock, body):
