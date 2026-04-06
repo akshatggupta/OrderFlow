@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 
-try:
+"""try:
     from dotenv import load_dotenv
     project_root = Path(__file__).parent.parent.parent.parent
     env_path = project_root / '.env'
@@ -17,10 +17,11 @@ except ImportError:
     print("⚠ python-dotenv not installed, using system environment variables")
 
 from service import start_fix_client
+"""
 
 
-def main():
-    """Main entry point for the Deribit FIX client"""
+
+from orderflow.cli.raw_fix_client import main
 
 if __name__ == "__main__":
     main()
