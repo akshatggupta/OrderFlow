@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import sys
 import os
+from orderflow.cli.raw_fix_client import *
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
 
 
 from datetime import datetime,timezone
@@ -14,7 +16,7 @@ TAG={
     "35": "msg_type",
     "49": "sender_comp_id",
     "56": "target_comp_id",
-    "34": "msg_id"
+    "34": "msg_id",
     "52": "sending_time",
     "55": "symbol",
     "231": "contract_multiplier",
@@ -39,17 +41,17 @@ GROUP_START_TAG = "279"
 
 def fix_time_to_epoch(ts:str) -> int:
     try:
-        dt = datetime.striptime(ts,%Y%m%d-%H:%m:%S.%f).replace(tzinfo=timezone.utc)
+        dt = datetime.strptime(ts, "%Y%m%d-%H:%M:%S.%f").replace(tzinfo=timezone.utc)
     except ValueError:
-        dt = datetime.striptime(ts,%Y%m%d-%H:%m%S).replace(tzinfo = timzone.utc)
+        dt = datetime.strptime(ts, "%Y%m%d-%H:%M%S").replace(tzinfo = timzone.utc)
     return int(dt.timestamp())*1000
 
 def fix_time_to_epoch_us(ts:str) -> int:
     return fix_time_to_epoch(ts)*1000
 
 
-def parse_raw(msg:bytes) -> dict[str,Any]:
-    raw = msg.decode("ascii", errors = "replace") if isinstance(msg,bytes) else msg
+def parse_raw(data:bytes) -> dict[str,Any]:
+    raw = data.decode("ascii", errors = "replace") if isinstance(data,bytes) else data
 
     fields: dict[str,Any] = {}
     md_entries : list[dict] = []
@@ -58,22 +60,23 @@ def parse_raw(msg:bytes) -> dict[str,Any]:
 
     for pair in raw.split("\x01"):
         if "=" not in pair:
-            tag,value = pair.split("=", 1)
+            continue
+        tag,value = pair.split("=", 1)
 
         if tag == "268":
             in_group = True
             fields["no_md_entries"] = int(value)
             continue 
         if in_group and tag in MD_GROUP_TAG:
-            if tag in GROUP_START_TAG:
+            if tag == GROUP_START_TAG:
                 if current_entry:
                     md_entries.append(current_entry)
                 current_entry = {}
                 if current_entry is not None:
                     current_entry[TAG.get(tag, f"tag_{tag}")] = _coerce(tag,value)
             
-            name = TAG.get(tag, f"tag_{tag}")
-            fields[name] = _coerce(tag,value)   
+        name = TAG.get(tag, f"tag_{tag}")
+        fields[name] = _coerce(tag,value)   
         
     if current_entry:
         md_entries.append(current_entry)
@@ -81,7 +84,7 @@ def parse_raw(msg:bytes) -> dict[str,Any]:
     if md_entries:
         fields["md_entries"] = md_entries
     
-    return fields
+    print(fields)
 
 
 
