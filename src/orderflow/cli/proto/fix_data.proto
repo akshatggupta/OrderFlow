@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package deribit.marketdata.v1;
+
+
+enum UpdateAction {
+  UPDATE_ACTION_NEW    = 0;  // FIX 279=0  — new price level
+  UPDATE_ACTION_CHANGE = 1;  // FIX 279=1  — size changed at level
+  UPDATE_ACTION_DELETE = 2;  // FIX 279=2  — level removed
+}
+
+enum EntryType {
+  ENTRY_TYPE_BID         = 0;  // FIX 269=0
+  ENTRY_TYPE_OFFER       = 1;  // FIX 269=1
+  ENTRY_TYPE_TRADE       = 2;  // FIX 269=2
+  ENTRY_TYPE_INDEX_VALUE = 3;  // FIX 269=3
+  ENTRY_TYPE_OPEN_INT    = 4;  // FIX 269=4
+  ENTRY_TYPE_SETTLEMENT  = 5;  // FIX 269=6
+}
+
+enum SubscriptionType {
+  SUB_TYPE_SNAPSHOT             = 0;  // FIX 263=0
+  SUB_TYPE_SNAPSHOT_INCREMENTAL = 1;  // FIX 263=1
+  SUB_TYPE_INCREMENTAL          = 2;  // FIX 263=2
+  SUB_TYPE_DISABLE              = 3;  // FIX 263=3
+}
+
+enum RejectReason {
+  REJECT_UNKNOWN_SYMBOL        = 0;  // FIX 281=0
+  REJECT_DUPLICATE_REQUEST     = 1;  // FIX 281=1
+  REJECT_INVALID_BOOK_TYPE     = 4;  // FIX 281=4
+  REJECT_UNSUPPORTED_REQ_TYPE  = 5;  // FIX 281=5
+}
+
+
+
+message Header {
+  string begin_string   = 1;
+  int64  seq_num        = 2;
+  string sender_comp_id = 3;
+  string target_comp_id = 4;
+  int64  sending_time   = 5;   // epoch ms UTC
+}
+
+message MDEntry {
+  optional UpdateAction update_action = 1;   // tag 279 — only in incremental
+  EntryType entry_type    = 2;
+  double    price         = 3;
+  double    size          = 4;
+  int64     entry_time_us = 5;   // epoch microseconds
+  optional string trade_id       = 6;
+  optional double aggressor_side = 7;
+}
+
+message Instrument {
+  string symbol        = 1;
+  double contract_mult = 2;
+  int64  instrument_id = 3;   // tag 100087 Deribit custom
+  double mark_price    = 4;   // tag 100090 Deribit custom
+  double open_interest = 5;   // tag 746
+}
+
+
+message MarketDataSnapshot {
+  Header     header      = 1;
+  Instrument instrument  = 2;
+  string     md_req_id   = 3;
+  repeated MDEntry entries = 4;
+  int64 last_seq_num     = 5;   // tag 369 — replay incrementals from here
+}
+
+
+message MarketDataIncremental {
+  Header     header     = 1;
+  Instrument instrument = 2;
+  string     md_req_id  = 3;
+  repeated MDEntry entries = 4;
+}
+
+
+message MarketDataReject {
+  Header       header        = 1;
+  string       md_req_id     = 2;
+  RejectReason reject_reason = 3;
+  string       reject_text   = 4;
+}
+
+
+message Heartbeat {
+  Header header      = 1;
+  string test_req_id = 2;
+}
+
+
+message SessionReject {
+  Header header          = 1;
+  int64  ref_seq_num     = 2;
+  int32  session_rej_rsn = 3;
+  string text            = 4;
+}
+
+
+
+enum MsgType {
+  MSG_TYPE_UNKNOWN     = 0;
+  MSG_TYPE_SNAPSHOT    = 1;   // W
+  MSG_TYPE_INCREMENTAL = 2;   // X
+  MSG_TYPE_REJECT      = 3;   // Y
+  MSG_TYPE_HEARTBEAT   = 4;   // 0
+  MSG_TYPE_SESSION_REJ = 5;   // 3
+}
+
+message FIXEnvelope {
+  MsgType msg_type = 1;
+
+  oneof payload {
+    MarketDataSnapshot    snapshot    = 2;
+    MarketDataIncremental incremental = 3;
+    MarketDataReject      reject      = 4;
+    Heartbeat             heartbeat   = 5;
+    SessionReject         session_rej = 6;
+  }
+}
