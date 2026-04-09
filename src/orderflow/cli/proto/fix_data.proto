@@ -8,7 +8,7 @@ enum UpdateAction {
   UPDATE_ACTION_CHANGE = 1;  // FIX 279=1  — size changed at level
   UPDATE_ACTION_DELETE = 2;  // FIX 279=2  — level removed
 }
-
+ 
 enum EntryType {
   ENTRY_TYPE_BID         = 0;  // FIX 269=0
   ENTRY_TYPE_OFFER       = 1;  // FIX 269=1
