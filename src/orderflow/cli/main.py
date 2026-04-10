@@ -1,27 +1,50 @@
-import os
-import sys
-from pathlib import Path
+import asyncio
+import logging
 
-"""try:
-    from dotenv import load_dotenv
-    project_root = Path(__file__).parent.parent.parent.parent
-    env_path = project_root / '.env'
-    
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path)
-        print(f" Loaded environment variables from {env_path}")
-    else:
-        print(f" No .env file found at {env_path}")
-        print(f"  Searched in project root: {project_root}")
-except ImportError:
-    print("⚠ python-dotenv not installed, using system environment variables")
-
-from service import start_fix_client
-"""
+from orderflow.fix_client import start_fix_client
+from orderflow.parser.fix_parser import parse_raw
+from orderflow.serializer.to_protobuf import to_protobuf
+from orderflow.nats.publisher import NatsPublisher
 
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("orderflow-main")
 
-from orderflow.cli.raw_fix_client import main
+
+async def handle_fix_message(raw_msg: str, publisher: NatsPublisher):
+    try:
+        # 1. Parse FIX → dict
+        parsed = parse_raw(raw_msg)
+        logger.info("Parsed FIX message")
+
+        # 2. Convert dict → protobuf bytes
+        proto_bytes = to_protobuf(parsed)
+        logger.info("Serialized to protobuf")
+
+        # 3. Publish to NATS
+        await publisher.publish("market.data.incremental", proto_bytes)
+        logger.info("Published to NATS")
+
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+
+
+
+async def run():
+    logger.info("Starting OrderFlow Pipeline...")
+
+    # 1. Initialize NATS Publisher
+    publisher = NatsPublisher()
+    await publisher.connect()
+
+    # 2. Start FIX client
+    await start_fix_client(
+        on_message=lambda msg: handle_fix_message(msg, publisher)
+    )
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
