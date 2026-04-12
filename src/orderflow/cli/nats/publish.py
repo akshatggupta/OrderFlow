@@ -13,16 +13,18 @@ async def main():
     try:
         await js.add_stream(
             name = "MARKETDATA",
-            subject = ["marketdata.>"]
+            subjects = ["marketdata.>"]
 
         )
     except nats.js.errors.BadRequestError:
         pass
-
+    
+    symbol = envelope.symbol  #tag 55 of fix
+    subject = f"marketdata.{symbol}"
     proto_bytes = envelope.SerialzeToString()
     ack = await js.publish(
-        "marketdata.BTC-PERCEPTUAL",
-        proto_byte,
+        subject,
+        proto_bytes,
     )
 
     print(f"stored in stream={ack.stream} at seq={ack.seq}")
