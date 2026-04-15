@@ -8,24 +8,58 @@ tasks:
     cmds:
       - task --list
 
-  click:
-    desc: "Run OrderFlow CLI"
-    silent: true
+
+  start:
+    desc: "Start NATS + FIX client + NATS publisher (full pipeline)"
     cmds:
-      - python3 src/orderflow/cli/main.py {{.ARGS}}
+      - task: infra
+      - task: service
+
+  infra:
+    desc: "Start NATS via docker-compose"
+    cmds:
+      - docker-compose up -d
+      - echo "Waiting for NATS to be healthy..."
+      - sleep 3
 
   service:
-    desc: "Run Deribit FIX service"
+    desc: "Run FIX → NATS pipeline"
     silent: true
     cmds:
-      - python3 src/orderflow/cli/main.py service --config src/orderflow/cli/initiator.cfg
+      - python3 -m orderflow.cli.main service --config src/orderflow/cli/config/initiator.cfg
+
+  status:
+    desc: "Check NATS JetStream status"
+    cmds:
+      - python3 -m orderflow.cli.main status
+
+  stop:
+    desc: "Stop NATS docker-compose services"
+    cmds:
+      - docker-compose down
+
+
+  logs:
+    desc: "Tail NATS server logs"
+    cmds:
+      - docker-compose logs -f nats
 
   clean:
     desc: "Clean logs and store files"
     cmds:
-      - rm -rf log/ store/
+      - rm -rf src/orderflow/cli/log/ src/orderflow/cli/store/
+      - echo "Cleaned log and store directories"
 
   install:
-    desc: "Install dependencies"
+    desc: "Install all dependencies"
     cmds:
-      - pip install quickfix click
+      - pip install nats-py protobuf grpcio-tools click
+
+  proto:
+    desc: "Recompile protobuf schema"
+    cmds:
+      - python3 -m grpc_tools.protoc
+          -I src/orderflow/cli/proto
+          --python_out=src/orderflow/cli/proto
+          src/orderflow/cli/proto/fix_data.proto
+      - echo "Protobuf compiled"

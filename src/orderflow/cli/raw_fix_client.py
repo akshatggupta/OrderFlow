@@ -2,9 +2,18 @@
 import time
 import base64
 import hashlib
+import os
 import socket
-from orderflow.cli.config.config import *
+import asyncio
 from orderflow.cli.parser.fix_parser import parse_raw
+from orderflow.cli.config.config import (
+    DERIBIT_HOST,
+    DERIBIT_PORT,
+    SOH,
+    seq,
+    username,
+    api_secret,
+)
 
 
 
@@ -17,7 +26,7 @@ def send_fix(sock, body):
     buff = "8=FIX.4.4" + SOH + "9=" + str(len(body)) + SOH + body
 
     checksum = 0
-    for i in range(1, len(body)):
+    for i in range(0, len(body)):
         checksum += ord(body[i])
 
     checksum = str(checksum % 256).zfill(3)
@@ -48,16 +57,16 @@ def auth(api_secret):
 def send_logon(sock,raw_data,password):
     logon_body = (
         "35=A" + SOH +
-        "49=" + username + SOH +
+        f"49={username}" + SOH +
         "56=DERIBITSERVER" + SOH +
         "34=SEQ" + SOH +
-        "52=" + str(time.time()) + SOH +
+        f"52={time.time()}" + SOH +
         "98=0" + SOH +
         "108=30" + SOH +
-        "95=" + str(len(raw_data)) + SOH +
-        "96=" + raw_data + SOH +
-        "553=" + username + SOH +
-        "554=" + password + SOH
+        f"95={len(raw_data)}" + SOH +
+        f"96={raw_data}" + SOH +
+        f"553={username}" + SOH +
+        f"554={password}"+ SOH
     )
 
     send_fix(sock, logon_body)
@@ -78,10 +87,10 @@ def send_market_data_req(sock):
 
     md_body = (
         "35=V" + SOH +
-        "49=" + username + SOH +
+        f"49={username}" + SOH +
         "56=DERIBITSERVER" + SOH +
         "34=SEQ" + SOH +
-        "52=" + str(time.time()) + SOH +
+        f"52={time.time()}" + SOH +
         "262=REQ1" + SOH +
         "263=1" + SOH +
         "265=1" + SOH +
@@ -106,9 +115,9 @@ def heartbeat(sock):
     body = (
         "35=0" + SOH +
         f"49={username}" + SOH +
-        "56 = DERIBITSERVER" + SOH +
-        "36 = seq" + SOH +
-        "52 = {time.time()}" + SOH
+        f"56=DERIBITSERVER" + SOH +
+        f"34 ={seq}" + SOH +
+        f"52={time.time()}" + SOH
     )
     send_fix(sock,body)
 
@@ -134,52 +143,48 @@ def extract_messages(buffer: bytes):
         messages.append(msg)
         buffer = buffer[msg_end:]
 
+async def start_fix_client(config: str, on_message=None):
+    sock = connect(DERIBIT_HOST,DERIBIT_PORT)
+    raw_data,password = auth(api_secret)
 
-def main():
-    sock = connect(DERIBIT_HOST, DERIBIT_PORT)
-
-    raw_data, password = auth(api_secret)
-
-    send_logon(sock, raw_data, password)
+    send_logon(sock,raw_data,password)
     send_market_data_req(sock)
 
-    print(" Listening for data...")
+    print("Listening for the data....")
 
     last_hb = time.time()
     buffer = b""
+    loop = asyncio.get_running_loop()
 
     while True:
-        data = sock.recv(4096)
+        data = await loop.run_in_executor(None, sock.recv, 4096)
 
+        if time.time() - last_hb > 25:
+            heartbeat(sock)
+            last_hb = time.time()
+        
         if not data:
             continue
 
-        buffer += data
-
-        messages, buffer = extract_messages(buffer)
-
-        print(f" Extracted {len(messages)} messages")
+        buffer+=data
+        messages,buffer = extract_messages(buffer)
+        print(f"Extracted {len(messages)} messages")
 
         for msg in messages:
-            parsed = parse_raw(msg)
-            print(" PARSED:", parsed)
+            parsed =parse_raw(msg)
+            print("PARSED:",parsed)
+            if on_message:
+                on_message(msg)
 
+
+def main():
+    import asyncio
+
+    async def debug_handler(msg):
+        parsed = parse_raw(msg)
+        print("PARSED:", parsed)
+    asyncio.run(start_fix_client(on_message=debug_handler))
+    
 if __name__ == "__main__":
     main()
 
-"""while True:
-    if time.time() - last_hb > 25:
-        hb = (
-            "35=0" + SOH +
-            "49=" + username + SOH +
-            "56=DERIBITSERVER" + SOH +
-            "34=SEQ" + SOH +
-            "52=" + str(time.time()) + SOH
-        )
-        send_fix(s, hb)
-        last_hb = time.time()
-
-    data = s.recv(4096)
-    if data:
-        print(data)
-"""

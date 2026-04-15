@@ -4,7 +4,8 @@ async def main():
 
     # pull subscribe — you control fetch rate
     sub = await js.pull_subscribe(
-        "marketdata.BTC-PERPETUAL",
+        "marketdata.>",
+        durable = "marketdata-consumer",
         stream="MARKETDATA"
     )
 
