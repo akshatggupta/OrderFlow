@@ -1,38 +1,34 @@
-import os
-import asyncio
-
+import json
 import nats
-from nats.errors import TimeoutError
-
-async def main():
-    #connect to nats
-    nc = await nats.connect("nats://localhost:4222")
-
-    js = nc.jetstream()
-
-    try:
-        await js.add_stream(
-            name = "MARKETDATA",
-            subjects = ["marketdata.>"]
-
-        )
-    except nats.js.errors.BadRequestError:
-        pass
-    
-    symbol = envelope.symbol  #tag 55 of fix
-    subject = f"marketdata.{symbol}"
-    proto_bytes = envelope.SerialzeToString()
-    ack = await js.publish(
-        subject,
-        proto_bytes,
-    )
-
-    print(f"stored in stream={ack.stream} at seq={ack.seq}")
 
 
-    await nc.drain()
+class NatsPublisher:
+    def __init__(self):
+        self.nc = None
+        self.js = None
 
+    async def connect(self):
+        # connect to NATS
+        self.nc = await nats.connect("nats://localhost:4222")
+        self.js = self.nc.jetstream()
 
-asyncio.run(main())
-    
+        # ensure stream exists
+        try:
+            await self.js.add_stream(
+                name="MARKETDATA",
+                subjects=["marketdata.>"]
+            )
+        except Exception:
+            # stream already exists
+            pass
 
+    async def publish(self, subject: str, data: bytes):
+        ack = await self.js.publish(subject, data)
+        return ack
+
+    def to_protobuf(self, data: dict) -> bytes:
+        """
+        TEMP: convert dict → JSON bytes
+        (you can replace with real protobuf later)
+        """
+        return json.dumps(data).encode()
