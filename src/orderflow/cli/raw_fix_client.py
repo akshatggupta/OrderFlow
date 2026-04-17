@@ -5,6 +5,7 @@ import hashlib
 import os
 import socket
 import asyncio
+from datetime import datetime, timezone
 from orderflow.cli.parser.fix_parser import parse_raw
 from orderflow.cli.config.config import (
     DERIBIT_HOST,
@@ -16,6 +17,9 @@ from orderflow.cli.config.config import (
 )
 
 
+def fix_timestamp():
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H:%M:%S.%f")[:-3]
+
 
 def send_fix(sock, body):
     global seq
@@ -23,16 +27,15 @@ def send_fix(sock, body):
     body = body.replace("34=SEQ", f"34={seq}")
     seq += 1
 
-    buff = "8=FIX.4.4" + SOH + "9=" + str(len(body)) + SOH + body
+    body_bytes = body.encode()
+    header = f"8=FIX.4.4{SOH}9={len(body_bytes)}{SOH}"
 
-    checksum = 0
-    for i in range(0, len(body)):
-        checksum += ord(body[i])
+    msg = header.encode() + body_bytes
 
-    checksum = str(checksum % 256).zfill(3)
-    buff += "10=" + checksum + SOH
+    checksum = sum(msg) % 256
+    msg += f"10={str(checksum).zfill(3)}{SOH}".encode()
 
-    sock.sendall(buff.encode())
+    sock.sendall(msg)
 
 #connect
 
@@ -44,9 +47,9 @@ def connect(DERIBIT_HOST,DERIBIT_PORT):
 
 #auth
 def auth(api_secret):
-    timestamp_in_ms = str(int(time.time())) + "000"
+    timestamp = str(int(time.time() * 1000))   
     nonce64 = base64.b64encode(os.urandom(32)).decode()
-    raw_data = timestamp_in_ms + "." + nonce64
+    raw_data = f"{timestamp}.{nonce64}"
 
     password = base64.b64encode(
         hashlib.sha256((raw_data + api_secret).encode()).digest()
@@ -59,13 +62,13 @@ def send_logon(sock,raw_data,password):
         "35=A" + SOH +
         f"49={username}" + SOH +
         "56=DERIBITSERVER" + SOH +
-        "34=SEQ" + SOH +
-        f"52={time.time()}" + SOH +
+        f"34=SEQ" + SOH +
+        f"52={fix_timestamp()}" + SOH +
         "98=0" + SOH +
         "108=30" + SOH +
         f"95={len(raw_data)}" + SOH +
         f"96={raw_data}" + SOH +
-        f"553={username}" + SOH +
+        f"553={username}" + SOH +    
         f"554={password}"+ SOH
     )
 
@@ -90,7 +93,7 @@ def send_market_data_req(sock):
         f"49={username}" + SOH +
         "56=DERIBITSERVER" + SOH +
         "34=SEQ" + SOH +
-        f"52={time.time()}" + SOH +
+        f"52={fix_timestamp()}" + SOH +
         "262=REQ1" + SOH +
         "263=1" + SOH +
         "265=1" + SOH +
@@ -103,7 +106,7 @@ def send_market_data_req(sock):
 
     md_body += (
         "267=2" + SOH +
-        "269=2" + SOH +
+        "269=0" + SOH +
         "269=1" + SOH
     )
 
@@ -113,13 +116,13 @@ def send_market_data_req(sock):
 
 def heartbeat(sock):
     body = (
-        "35=0" + SOH +
-        f"49={username}" + SOH +
-        f"56=DERIBITSERVER" + SOH +
-        f"34 ={seq}" + SOH +
-        f"52={time.time()}" + SOH
+        f"35=0{SOH}"
+        f"49={username}{SOH}"
+        f"56=DERIBITSERVER{SOH}"
+        f"34=SEQ{SOH}"
+        f"52={fix_timestamp()}{SOH}"
     )
-    send_fix(sock,body)
+    send_fix(sock, body)
 
 def extract_messages(buffer: bytes):
     messages = []
@@ -174,7 +177,7 @@ async def start_fix_client(config: str, on_message=None):
             parsed =parse_raw(msg)
             print("PARSED:",parsed)
             if on_message:
-                on_message(msg)
+                await on_message(msg)
 
 
 def main():
