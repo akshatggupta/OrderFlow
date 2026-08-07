@@ -3,10 +3,8 @@ import logging
 import subprocess
 import time
 import sys
-import os
 import click
 from orderflow.cli.raw_fix_client import start_fix_client
-from orderflow.cli.parser.fix_parser import parse_raw
 from orderflow.cli.nats.publish import NatsPublisher
 
 logging.basicConfig(
@@ -16,17 +14,24 @@ logging.basicConfig(
 logger = logging.getLogger("orderflow")
 
 
-async def handle_fix_message(raw_msg: bytes, publisher: NatsPublisher):
-    """Parse FIX → protobuf → publish to NATS."""
+async def handle_fix_message(parsed: dict, publisher: NatsPublisher):
+    """
+    Publish an already-parsed FIX message to NATS as protobuf.
+
+    `parsed` is produced once by raw_fix_client.start_fix_client() and handed
+    to this callback -- do NOT call parse_raw() again here. Re-parsing would
+    double the CPU cost per message and risks divergence if the two parse
+    paths ever disagree.
+    """
     try:
-       # Parse FIX bytes → Python dict
-        parsed = parse_raw(raw_msg)
         msg_type = parsed.get("msg_type", "?")
         seq      = parsed.get("msg_seq_num", "?")
 
-        # skip empty refreshes — nothing to publish
-        if msg_type == "X" and not parsed.get("md_entries"):
-            logger.debug(f"Empty refresh seq={seq} — skipping")
+        # Skip empty refreshes -- nothing to publish. Applies to both
+        # incremental (X) and snapshot (W) messages: a snapshot with no
+        # entries is as useless downstream as an incremental with none.
+        if not parsed.get("md_entries"):
+            logger.debug(f"Empty refresh seq={seq} type={msg_type} — skipping")
             return
 
         # Serialize dict → protobuf bytes
@@ -56,14 +61,18 @@ async def run_pipeline(config: str):
     await publisher.connect()
     logger.info("NATS connected")
 
-    # 2. start FIX client — passes each raw message to handle_fix_message
+    # 2. start FIX client — passes each already-parsed message to
+    # handle_fix_message. start_fix_client() calls parse_raw() exactly once
+    # per message and forwards (msg, parsed) here, so this callback must
+    # accept both positional args even though only `parsed` is used.
     logger.info(f"Starting FIX client with config: {config}")
     await start_fix_client(
         config=config,
-        on_message=lambda msg: asyncio.create_task(
-            handle_fix_message(msg, publisher)
+        on_message=lambda msg, parsed: asyncio.create_task(
+            handle_fix_message(parsed, publisher)
         )
     )
+
 
 @click.group()
 def cli():

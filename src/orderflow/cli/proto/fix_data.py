@@ -29,7 +29,7 @@ def to_protobuf(parsed:dict) -> bytes:
             size = e["md_entry_size"],
             entry_time_us = fix_time_to_epoch(e["md_entry_date"])
         )
-    entries.append(entry)
+        entries.append(entry)
 
     incremental = pb.MarketDataIncremental(
         header = header,
