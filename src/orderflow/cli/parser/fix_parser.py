@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 import os
-from orderflow.cli.config.config import DERIBIT_HOST, DERIBIT_PORT, SOH, seq, username, api_secret
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
